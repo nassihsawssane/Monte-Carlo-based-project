@@ -1,0 +1,68 @@
+import numpy as np
+
+# Fonction de log-vraisemblance conditionnelle du modèle GARCH log(L(r/w))
+def log_likelihood(returns, omega1, omega2, omega3):
+    T = len(returns)
+    h = np.zeros(T)
+    h[0] = np.var(returns) # à la première valeur de h on associe la variance des taux d'intérêt.
+    
+    for t in range(1, T):
+        h[t] = omega1 + omega3 * h[t-1] + omega2 * (returns[t-1] ** 2)
+    
+    logL = -0.5 * np.sum(np.log(2 * np.pi * h) + (returns ** 2) / h)
+    return logL
+
+# Distribution a priori uniforme pour les paramètres omega
+def prior(omega1, omega2, omega3):
+    return 1
+
+
+# Probabilité de transition de x vers y et de y vers x 
+def q(x, y, stepsize=0.01):
+    return (1 / np.sqrt(2 * np.pi * stepsize**2)) * np.exp(-(y - x)**2 / (2 * stepsize**2))
+#si on suppose que q c'est une gaussienne et que q(x,y)=q(y,x) alors on n'a plus de q dans l'expression de r.
+
+
+#Pi est la distribution de omega sachant r est proportionnelle à la distribution de r sachant w * la distribution a priori de w.
+
+def generateur_Metropolis(returns, omega1_current, omega2_current, omega3_current, n_iter, burn_in, var=0.01):
+
+    L=[]
+
+    for i in range (0,n_iter):
+
+# Proposer un nouveau jeu de paramètres omega qui correspond à Y et omega_current c'est Xn-1.
+        omega1_n = omega1_current + np.random.normal(0, var) # var = variance
+        omega2_n = omega2_current + np.random.normal(0, var)
+        omega3_n = omega3_current + np.random.normal(0, var)
+
+# Fonction pour calculer r(x, y)
+        q_ratio = q(omega1_current, omega1_n) * q(omega2_current, omega2_n) * q(omega3_current, omega3_n) /\
+              (q(omega1_n, omega1_current) * q(omega2_n, omega2_current) * q(omega3_n, omega3_current))
+    
+        r = np.exp(log_likelihood(returns, omega1_n, omega2_n, omega3_n) - log_likelihood(returns, omega1_current, omega2_current, omega3_current)) * q_ratio
+
+# algorithme pour affecter une valeur à omega_n soit Xn : 
+        if np.random.uniform() < min(1,r) : 
+            omega1_current = omega1_n # avec proba min(1,r), Xn=Y.
+            omega2_current = omega2_n
+            omega3_current = omega3_n
+
+# on prend uniquement les paramètres omega obtenus après les étapes de burn-in.
+        if i > burn_in :
+            L.append ([omega1_current, omega2_current, omega3_current])
+
+    return L
+
+
+
+# Paramètres initiaux
+omega1_current = 0.1
+omega2_current = 0.1
+omega3_current = 0.8
+
+# Générer les rendements simulés pour le test
+np.random.seed(42)
+returns = np.random.normal(0, 1, 1000)
+
+# Tableau de returns réels à partir d'un tableau de taux de change.
