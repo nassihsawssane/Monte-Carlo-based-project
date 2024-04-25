@@ -1,0 +1,136 @@
+import numpy as np
+import pandas as pd
+
+np.random.seed(42)
+
+# Fonction de log-vraisemblance conditionnelle du modèle GARCH log(L(r/w))
+def likelihood(returns, omega):
+    T = len(returns)
+    h = np.zeros(T)
+    h[0] = np.var(returns) # à la première valeur de h on associe la variance des taux d'intérêt.
+    
+    for t in range(1, T):
+        h[t] = omega[1] + omega[3] * h[t-1] + omega[2] * (returns[t-1] ** 2)
+    
+    L = np.prod(1/np.sqrt(2*np.pi*h) * np.exp(-0.5*(returns**2)/h))
+    return L
+
+# Distribution a priori de (w1, w2, w3). Les oméga sont indépendants et sont de distribution normale centrée.
+def prior(omega, var_1, var_2, var_3):
+    return np.exp((-1/2)*((omega[1]**2)/(var_1) + (omega[2]**2)/(var_2) + (omega[3]**2)/(var_3)))
+
+
+# Probabilité de transition de x vers y et de y vers x 
+def q(x, y, sigma):
+    sigma_inv = np.linalg.inv(sigma)
+    q = (1 / (np.sqrt((2 * np.pi)**3 * np.linalg.det(sigma)))) * np.exp(-0.5 * np.dot(np.dot((y - x).T, sigma_inv), (y - x)))
+    return q
+#si on suppose que q c'est une gaussienne et que q(x,y)=q(y,x) alors on n'a plus de q dans l'expression de r.
+
+# détermination de la constante c: 
+def constante_c (returns, omega_current, n_iter, var_2, var_3, var_1, a, b):
+    
+    J=[] #cette liste va stocker les taux d'acceptance pour chaque c 
+    C=np.linspace(a,b,1000) #on se donne un certain nombre de valeurs de c dans un intervalle [a,b]
+    for c in C :
+        j=0
+        omega_matrix = omega_current.reshape(-1, 1) #matrice qui va contenir l'échantillon
+        sigma = np.zeros((3,3)) #matrice de covariance empirique sigma pi.
+
+        for i in range (0,n_iter):
+
+    # Proposer un nouveau jeu de paramètres omega_n qui correspond à Y et omega_current c'est Xn-1.
+
+            L = np.linalg.cholesky(sigma)
+            z = np.random.normal(size=omega_current.shape)
+            omega_n = omega_current + np.dot(L, z)
+
+    # Fonction pour calculer r(x, y)
+            q_ratio = q(omega_current, omega_n, sigma) /\ 
+            q(omega_n, omega_current, sigma)  # dans notre cas q_ratio est normalement égal à 1.
+        
+            r = ((prior(omega_n, var_1, var_2, var_3) * likelihood(returns, omega_n))/(prior(omega_current, var_1, var_2, var_3) * likelihood(returns, omega_current))) * q_ratio
+            #formule prise dans les slides du cours.
+
+    # algorithme pour affecter une valeur à Xn : 
+            if np.random.uniform() < min(1,r) : 
+                omega_current = omega_n # avec proba min(1,r), Xn=Y.
+                j=j+1
+            
+            omega_matrix = np.hstack((omega_matrix, omega_current.reshape(-1, 1))) #ajout du nouveau vecteur des omégas à notre matrice pour pouvoir calculer après sigma.
+            mean_X = np.mean(omega_matrix, axis=0)
+        
+        # Centrer les échantillons
+            centered_omega = omega_matrix - mean_X
+        
+        # Calculer la covariance empirique
+            n = omega_matrix.shape[1] #on récupère la taille de l'échantillon (donc le nombre de Xi)
+            sigma = c * (1 / (n - 1)) * np.sum([np.outer(x, x) for x in centered_omega], axis=0) #la fonction outer calcule le produit a*(b transposé)
+        
+        J.append (j/n_iter)
+    
+    return c 
+
+
+#Pi est la distribution de (w1, w2, w3) sachant r, est proportionnelle à la distribution du vecteur des r sachant (w1, w2, w3) * la distribution a priori de (w1, w2, w3).
+
+
+
+def generateur_Metropolis(returns, omega_current, n_iter, burn_in, var_2, var_3, var_1):
+
+    M = []
+    omega_matrix = omega_current.reshape(-1, 1) #matrice qui va contenir l'échantillon
+    sigma = np.zeros((3,3)) #matrice de covariance empirique sigma pi.
+
+    for i in range (0,n_iter):
+
+# Proposer un nouveau jeu de paramètres omega_n qui correspond à Y et omega_current c'est Xn-1.
+
+        L = np.linalg.cholesky(sigma)
+        z = np.random.normal(size=omega_current.shape)
+        omega_n = omega_current + np.dot(L, z)
+
+# Fonction pour calculer r(x, y)
+        q_ratio = q(omega_current, omega_n, sigma) /\ 
+        q(omega_n, omega_current, sigma)  # dans notre cas q_ratio est normalement égal à 1.
+    
+        r = ((prior(omega_n, var_1, var_2, var_3) * likelihood(returns, omega_n))/(prior(omega_current, var_1, var_2, var_3) * likelihood(returns, omega_current))) * q_ratio
+        #formule prise dans les slides du cours.
+
+# algorithme pour affecter une valeur à Xn : 
+        if np.random.uniform() < min(1,r) : 
+            omega_current = omega_n # avec proba min(1,r), Xn=Y.
+        
+        omega_matrix = np.hstack((omega_matrix, omega_current.reshape(-1, 1))) #ajout du nouveau vecteur des omégas à notre matrice pour pouvoir calculer après sigma.
+        mean_X = np.mean(omega_matrix, axis=0)
+    
+    # Centrer les échantillons
+        centered_omega = omega_matrix - mean_X
+    
+    # Calculer la covariance empirique
+        n = omega_matrix.shape[1] #on récupère la taille de l'échantillon (donc le nombre de Xi)
+        sigma = (1 / (n - 1)) * np.sum([np.outer(x, x) for x in centered_omega], axis=0) #la fonction outer calcule le produit a*(b transposé)
+
+
+# on prend uniquement les paramètres omega obtenus après les étapes de burn-in.
+        if i > burn_in :
+            M.append (omega_current)
+
+    return M
+
+
+
+# Paramètres initiaux
+omega1_current = 0.1
+omega2_current = 0.1
+omega3_current = 0.8
+
+# Générer les rendements simulés pour le test
+returns = np.random.normal(0, 1, 1000)
+
+# Tableau de returns réels à partir d'un tableau de taux de change.
+
+df = pd.read_excel('chemin_vers_ton_fichier.xlsx')
+df = df.sort_values('Date')
+df = df.dropna(subset=['USD/EUR'])
+df['Returns'] = df['USD/EUR'].pct_change() * 100
