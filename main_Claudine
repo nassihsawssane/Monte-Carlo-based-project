@@ -1,4 +1,7 @@
 from Garch_question_1 import constante_c
+from Garch_question_1 import likelihood
+from Garch_question_1 import prior
+from Garch_question_1 import q
 
 import numpy as np
 
