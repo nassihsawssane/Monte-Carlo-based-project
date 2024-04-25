@@ -1,0 +1,19 @@
+from Garch_question_1 import constante_c
+from Garch_question_1 import likelihood
+from Garch_question_1 import prior
+from Garch_question_1 import q
+
+import numpy as np
+
+np.random.seed(42)
+
+returns = np.random.normal(0, 1, 1000)
+omega_current = [0.1, 0.1, 0.8]
+n_iter = 2000
+var_1 = 100
+var_2 = 200
+var_3 = 150
+a = 0
+b = 1
+
+constante_c (returns, omega_current, n_iter, var_2, var_3, var_1, a, b )
