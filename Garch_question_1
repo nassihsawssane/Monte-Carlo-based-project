@@ -46,7 +46,7 @@ def constante_c (returns, omega_current, n_iter, var_2, var_3, var_1, a, b):
             omega_n = omega_current + np.dot(L, z)
 
     # Fonction pour calculer r(x, y)
-            q_ratio = q(omega_current, omega_n, sigma) /\ 
+            q_ratio = q(omega_current, omega_n, sigma) 
             q(omega_n, omega_current, sigma)  # dans notre cas q_ratio est normalement égal à 1.
         
             r = ((prior(omega_n, var_1, var_2, var_3) * likelihood(returns, omega_n))/(prior(omega_current, var_1, var_2, var_3) * likelihood(returns, omega_current))) * q_ratio
@@ -91,7 +91,7 @@ def generateur_Metropolis(returns, omega_current, n_iter, burn_in, var_2, var_3,
         omega_n = omega_current + np.dot(L, z)
 
 # Fonction pour calculer r(x, y)
-        q_ratio = q(omega_current, omega_n, sigma) /\ 
+        q_ratio = q(omega_current, omega_n, sigma)
         q(omega_n, omega_current, sigma)  # dans notre cas q_ratio est normalement égal à 1.
     
         r = ((prior(omega_n, var_1, var_2, var_3) * likelihood(returns, omega_n))/(prior(omega_current, var_1, var_2, var_3) * likelihood(returns, omega_current))) * q_ratio
